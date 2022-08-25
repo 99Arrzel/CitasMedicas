@@ -1,0 +1,165 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  // NOTE: When using postgresql, mysql or sqlserver, uncomment the @db.text annotations in model Account below
+  // Further reading:
+  // https://next-auth.js.org/adapters/prisma#create-the-prisma-schema
+  // https://www.prisma.io/docs/reference/api-reference/prisma-schema-reference#string
+  url      = env("DATABASE_URL")
+}
+
+//Database models
+
+//Personas
+enum tipo_sanguineo {
+  O
+  A
+  B
+  AB
+}
+
+model Personas {
+  id               Int            @id @default(autoincrement())
+  nombre           String
+  apellido_p       String
+  apellido_m       String?
+  tipo_sanguineo   tipo_sanguineo
+  ci               String?        @unique @db.VarChar(50)
+  telefono         String?        @unique @db.VarChar(20)
+  direccion        String?        @db.Text
+  fecha_nacimiento DateTime?
+  ciudad           Ciudad?
+  eliminado        DateTime?
+  creado_en        DateTime?
+  actualizado_en   DateTime?
+  Usuarios         Usuarios[]
+  Parientes        Parientes[]    @relation(name: "persona")
+  Es_pariente      Parientes[]    @relation(name: "pariente")
+  Citas            Citas[]        @relation(name: "paciente")
+  Historial        Historial[]    @relation(name: "h_paciente")
+}
+
+enum Ciudad {
+  LaPaz
+  Cochabamba
+  SantaCruz
+  Oruro
+  Sucre
+  Potosi
+  Tarija
+  Pando
+  Beni
+}
+
+enum Nivel {
+  Administrador
+  Medico
+  Secretario
+  Paciente
+}
+
+model Usuarios {
+  id              Int         @id @default(autoincrement())
+  personaId       Int         @unique
+  usuario         String      @unique
+  password        String
+  nivel           Nivel
+  estado          Int         @db.TinyInt
+  creado_en       DateTime?
+  image           String?     @map("foto")
+  persona         Personas    @relation(fields: [personaId], references: [id])
+  email           String      @unique @map("correo")
+  emailVerified   DateTime?   @map("correoVerificado")
+  Citas_Agendadas Citas[]     @relation(name: "secretaria")
+  Diagnosticos    Historial[] @relation(name: "medico")
+}
+
+enum Relaciones {
+  Padre
+  Hijo
+}
+
+model Parientes {
+  id         Int        @id @default(autoincrement())
+  relacion   Relaciones
+  personaId  Int
+  persona    Personas   @relation(name: "persona", fields: [personaId], references: [id])
+  parienteId Int
+  pariente   Personas   @relation(name: "pariente", fields: [parienteId], references: [id])
+}
+
+model Citas {
+  id             Int       @id @default(autoincrement())
+  pacienteId     Int
+  paciente       Personas  @relation(name: "paciente", fields: [pacienteId], references: [id])
+  secretariaId   Int
+  secretaria     Usuarios  @relation(name: "secretaria", fields: [secretariaId], references: [id])
+  fecha          DateTime
+  motivo         String    @db.Text //Detalle de la cita
+  estado         Int       @db.TinyInt //Si da de baja la cita por ejemplo
+  creado_en      DateTime?
+  actualizado_en DateTime?
+}
+
+model Sedes {
+  id             Int         @id @default(autoincrement())
+  nombre         String      @unique
+  direccion      String      @db.Text
+  telefono       String      @unique
+  ciudad         Ciudad
+  creado_en      DateTime?   @default(now())
+  actualizado_en DateTime?   @default(now())
+  Diagnosticos   Historial[] @relation(name: "sede")
+}
+
+model Historial {
+  id             Int            @id @default(autoincrement())
+  pacienteId     Int
+  paciente       Personas       @relation(name: "h_paciente", fields: [pacienteId], references: [id])
+  medicoId       Int
+  medico         Usuarios       @relation(name: "medico", fields: [medicoId], references: [id])
+  fecha          DateTime
+  sedeId         Int
+  sede           Sedes          @relation(name: "sede", fields: [sedeId], references: [id])
+  detalles       String         @db.Text //Detalle del diagnostico
+  creado_en      DateTime?      @default(now())
+  actualizado_en DateTime?      @default(now())
+  Diagnosticos   Diagnosticos[]
+}
+
+//https://en.wikipedia.org/wiki/Pathology esto puede ser una lista larguisima pero es limitada
+enum Patologia {
+  Anatomica
+  Citologica
+  Dermica
+  Histologica
+  Neurologica
+  Pulmonaria
+  Renal
+  Urologica
+  Hematologica
+}
+
+model Enfermedad {
+  id        Int       @id @default(autoincrement())
+  nombre    String    @unique
+  patologia Patologia
+  detalle   String    @db.Text
+
+  Diagnosticos Diagnosticos[]
+}
+
+model Diagnosticos {
+  enfermedadId Int
+  enfermedad   Enfermedad @relation(fields: [enfermedadId], references: [id])
+  historialId  Int
+  historial    Historial  @relation(fields: [historialId], references: [id])
+
+  @@unique([enfermedadId, historialId])
+}
